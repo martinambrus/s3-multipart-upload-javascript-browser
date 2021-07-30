@@ -19,7 +19,7 @@ function S3MultiUpload(file) {
     this.total = [];
     this.chunkRetries = {};
     this.maxRetries = 4;
-    this.retryBackoffTimeout = 5000; // ms
+    this.retryBackoffTimeout = 15000; // ms
 }
 
 /**
@@ -115,7 +115,7 @@ S3MultiUpload.prototype.sendToS3 = function(data, blob, index) {
                     setTimeout( function() {
                         console.log('starting retry #' + self.chunkRetries[ url ] + ' for ' + url );
                         self.sendToS3( data, blob, index );
-                    }, self.retryBackoffTimeout );
+                    }, self.retryBackoffTimeout * self.chunkRetries[ url ] );
                 } else {
                     self.updateProgress();
                     self.onS3UploadError(request);
