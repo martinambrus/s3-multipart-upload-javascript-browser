@@ -17,7 +17,9 @@ function S3MultiUpload(file) {
     this.lastUploadedTime = []
     this.loaded = [];
     this.total = [];
-
+    this.chunkRetries = {};
+    this.maxRetries = 4;
+    this.retryBackoffTimeout = 5000; // ms
 }
 
 /**
@@ -47,13 +49,12 @@ S3MultiUpload.prototype.start = function() {
 S3MultiUpload.prototype.uploadParts = function() {
     var blobs = this.blobs = [], promises = [];
     var start = 0;
-    var parts =0;
     var end, blob;
     var partNum = 0;
 
     while(start < this.file.size) {
         end = Math.min(start + this.PART_SIZE, this.file.size);
-		filePart = this.file.slice(start, end);
+		    filePart = this.file.slice(start, end);
         // this is to prevent push blob with 0Kb
         if (filePart.size > 0)
             blobs.push(filePart);
@@ -69,6 +70,7 @@ S3MultiUpload.prototype.uploadParts = function() {
             contentLength: blob.size
         }));
     }
+
     $.when.apply(null, promises)
      .then(this.sendAll.bind(this), this.onServerError)
      .done(this.onPrepareCompleted);
@@ -101,8 +103,23 @@ S3MultiUpload.prototype.sendToS3 = function(data, blob, index) {
         if (request.readyState === 4) { // 4 is DONE
             // self.uploadXHR[index] = null;
             if (request.status !== 200) {
-                self.updateProgress();
-                self.onS3UploadError(request);
+                // check if we should retry this transfer of fail
+                if ( !self.chunkRetries[ url ] || self.chunkRetries[ url ] < self.maxRetries ) {
+                    if ( !self.chunkRetries[ url ] ) {
+                        self.chunkRetries[ url ] = 1;
+                    } else {
+                        self.chunkRetries[ url ]++;
+                    }
+
+                    console.log('will retry ' + url + ' due to invalid request status: ' + request.status + ' (' + request.responseText + ')');
+                    setTimeout( function() {
+                        console.log('starting retry #' + self.chunkRetries[ url ] + ' for ' + url );
+                        self.sendToS3( data, blob, index );
+                    }, self.retryBackoffTimeout );
+                } else {
+                    self.updateProgress();
+                    self.onS3UploadError(request);
+                }
                 return;
             }
             self.updateProgress();
