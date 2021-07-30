@@ -23,6 +23,9 @@ else
     function aws_secret(){
         return 'YOUR_AWS_SECRET';
     }
+    function aws_endpoint(){
+      return 'YOUR_AWS_OR_COMPATIBLE_ENDPOINT';
+    }
     function bucket() {
         return "YOUR_S3_BUCKET";
     }
@@ -47,6 +50,7 @@ function s3($command=null,$args=null)
 	$s3 = new Aws\S3\S3Client([
 	    'version' => 'latest',
 	    'region'  => 'us-east-1',
+      'endpoint' => aws_endpoint(),
 	    'signature_version' => 'v4',
 	        'credentials' => [
 	        'key'    => aws_key(),

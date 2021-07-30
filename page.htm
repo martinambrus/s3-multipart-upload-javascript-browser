@@ -124,6 +124,16 @@ function upload(file) {
         alert("You are using an unsupported browser. Please update your browser.");
         return;
     }
+
+    if ( !file || typeof( file ) == 'undefined' ) {
+        return;
+    }
+
+    if ( file.size < 5242880 ) {
+        alert('Only files upwards 5MB can be uploaded using this uploader.');
+        return;
+    }
+
     $(".fileinput-button").toggle();
     $(".cancel-button").toggle();
     $("#result").text("");
