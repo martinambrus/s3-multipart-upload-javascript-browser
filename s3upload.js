@@ -101,26 +101,30 @@ S3MultiUpload.prototype.sendToS3 = function(data, blob, index) {
     var request = self.uploadXHR[index] = new XMLHttpRequest();
     request.onreadystatechange = function() {
         if (request.readyState === 4) { // 4 is DONE
-            // self.uploadXHR[index] = null;
-            if (request.status !== 200) {
-                // check if we should retry this transfer of fail
-                if ( !self.chunkRetries[ url ] || self.chunkRetries[ url ] < self.maxRetries ) {
-                    if ( !self.chunkRetries[ url ] ) {
-                        self.chunkRetries[ url ] = 1;
-                    } else {
-                        self.chunkRetries[ url ]++;
-                    }
+            // on abort, don't count that as an error - aborted is a manually added field, since status would be 0 whether
+            // we aborted manually or an Internet connection interrupt occured, so that's no use to us
+            if ( !request.aborted ) {
+                // self.uploadXHR[index] = null;
+                if (request.status !== 200) {
+                    // check if we should retry this transfer of fail
+                    if (!self.chunkRetries[url] || self.chunkRetries[url] < self.maxRetries) {
+                        if (!self.chunkRetries[url]) {
+                            self.chunkRetries[url] = 1;
+                        } else {
+                            self.chunkRetries[url]++;
+                        }
 
-                    console.log('will retry ' + url + ' due to invalid request status: ' + request.status + ' (' + request.responseText + ')');
-                    setTimeout( function() {
-                        console.log('starting retry #' + self.chunkRetries[ url ] + ' for ' + url );
-                        self.sendToS3( data, blob, index );
-                    }, self.retryBackoffTimeout * self.chunkRetries[ url ] );
-                } else {
-                    self.updateProgress();
-                    self.onS3UploadError(request);
+                        console.log('will retry ' + url + ' due to invalid request status: ' + request.status + ' (' + request.responseText + ')');
+                        setTimeout(function () {
+                            console.log('starting retry #' + self.chunkRetries[url] + ' for ' + url);
+                            self.sendToS3(data, blob, index);
+                        }, self.retryBackoffTimeout * self.chunkRetries[url]);
+                    } else {
+                        self.updateProgress();
+                        self.onS3UploadError(request);
+                    }
+                    return;
                 }
-                return;
             }
             self.updateProgress();
         }
@@ -163,6 +167,7 @@ S3MultiUpload.prototype.sendToS3 = function(data, blob, index) {
 S3MultiUpload.prototype.cancel = function() {
     var self = this;
     for (var i=0; i<this.uploadXHR.length; ++i) {
+        this.uploadXHR[i].aborted = true;
         this.uploadXHR[i].abort();
     }
     $.post(self.SERVER_LOC, {
